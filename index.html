@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金融从业 · 刷题系统</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --pri:#2f6bff; --pri-dk:#1f4fd6;
+    --ok:#16a34a; --err:#dc2626; --gray:#6b7280; --line:#e5e7eb;
+    --txt:#1f2937; --soft:#f1f5ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--txt); line-height:1.7; padding:16px;}
+  .wrap{max-width:820px; margin:0 auto;}
+  header{text-align:center; margin-bottom:16px;}
+  header h1{font-size:22px; color:var(--pri);}
+  header p{color:var(--gray); font-size:13px; margin-top:4px;}
+
+  .card{background:var(--card); border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.06); padding:20px; margin-bottom:16px;}
+
+  /* 顶部统计条 */
+  .stats{display:flex; gap:10px; flex-wrap:wrap; justify-content:space-between; align-items:center;}
+  .stat{background:var(--soft); border-radius:10px; padding:8px 14px; font-size:13px; flex:1; text-align:center;}
+  .stat b{display:block; font-size:20px; color:var(--pri);}
+  .progress{height:8px; background:var(--line); border-radius:6px; overflow:hidden; margin-top:12px;}
+  .progress>div{height:100%; background:linear-gradient(90deg,var(--pri),#5b8bff); width:0%; transition:.3s;}
+
+  /* 筛选 */
+  .filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
+  .filters select,.filters button{padding:8px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; cursor:pointer;}
+  .filters button{background:var(--pri); color:#fff; border-color:var(--pri);}
+  .filters button.ghost{background:#fff; color:var(--pri);}
+  .filters button.danger{background:#fff; color:var(--err); border-color:var(--err);}
+
+  /* 题库切换 */
+  .bank-bar{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+  .bank-bar label{font-size:14px; color:var(--gray); white-space:nowrap;}
+  .bank-bar select{flex:1; min-width:200px; padding:10px 12px; border:1.5px solid var(--pri);
+    border-radius:10px; font-size:15px; background:#fff; color:var(--pri); font-weight:600; cursor:pointer;}
+  .bank-info{font-size:13px; color:var(--gray); width:100%;}
+  .bank-info b{color:var(--pri);}
+
+  /* 题目 */
+  .q-type{display:inline-block; font-size:12px; background:var(--soft); color:var(--pri);
+    padding:2px 10px; border-radius:20px; margin-bottom:8px;}
+  .q-stem{font-size:17px; font-weight:600; margin-bottom:14px;}
+  .opts{display:flex; flex-direction:column; gap:10px;}
+  .opt{display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border:1.5px solid var(--line);
+    border-radius:10px; cursor:pointer; transition:.15s;}
+  .opt:hover{border-color:var(--pri);}
+  .opt .k{width:26px; height:26px; min-width:26px; border-radius:50%; background:var(--soft);
+    color:var(--pri); font-weight:700; display:flex; align-items:center; justify-content:center; font-size:13px;}
+  .opt.multi .k{border-radius:6px;}
+  .opt .v{flex:1; font-size:15px;}
+  .opt.sel{border-color:var(--pri); background:var(--soft);}
+  .opt.correct{border-color:var(--ok); background:#ecfdf5;}
+  .opt.wrong{border-color:var(--err); background:#fef2f2;}
+  .opt.dim{opacity:.5;}
+  .q-actions{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
+  .btn{flex:1; min-width:120px; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer;}
+  .btn-pri{background:var(--pri); color:#fff;}
+  .btn-pri:hover{background:var(--pri-dk);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  /* 解析 & 结果 */
+  .result{margin-top:16px; padding:14px; border-radius:10px; font-size:15px; font-weight:600;}
+  .result.ok{background:#ecfdf5; color:var(--ok);}
+  .result.err{background:#fef2f2; color:var(--err);}
+  .analysis{margin-top:12px; padding:14px; background:#f8fafc; border-radius:10px; font-size:14px; color:#334155; white-space:pre-wrap;}
+
+  /* 背题模式 */
+  .recite-answer{display:flex; align-items:center; gap:12px; margin:14px 0; padding:12px 14px;
+    background:var(--soft); border-radius:10px;}
+  .recite-label{font-size:13px; color:var(--gray);}
+  .recite-ans{font-size:18px; font-weight:700; color:var(--pri);}
+  .recite-ans.blur{filter:blur(6px); user-select:none; transition:.3s;}
+  .analysis.show{display:block;}
+  .analysis{display:none;}
+  .analysis.show{display:block;}
+  .nav{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:16px;}
+  .nav button{padding:10px 18px; border:1px solid var(--line); border-radius:10px; background:#fff; cursor:pointer; font-size:14px;}
+  .hidden{display:none;}
+  footer{text-align:center; color:var(--gray); font-size:12px; margin-top:20px;}
+  .finish{text-align:center; padding:20px;}
+  .finish h2{font-size:22px; margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📚 金融从业 · 刷题系统</h1>
+    <p id="subtitle">多题库切换 · 自动判对错 · 记录错题 · 进度本地保存</p>
+  </header>
+
+  <!-- 题库切换 -->
+  <div class="card">
+    <div class="bank-bar">
+      <label for="f-bank">📁 当前题库：</label>
+      <select id="f-bank"></select>
+    </div>
+    <div class="bank-info" id="bank-info"></div>
+  </div>
+
+  <!-- 统计面板 -->
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><b id="s-total">0</b>总题数</div>
+      <div class="stat"><b id="s-done">0</b>已作答</div>
+      <div class="stat"><b id="s-ok">0</b>答对</div>
+      <div class="stat"><b id="s-err">0</b>答错</div>
+    </div>
+    <div class="progress"><div id="prog"></div></div>
+  </div>
+
+  <!-- 模式 & 筛选控制 -->
+  <div class="filters card">
+    <select id="f-mode" title="切换答题/背题模式">
+      <option value="quiz">✍️ 答题模式</option>
+      <option value="recite">📖 背题模式</option>
+    </select>
+    <select id="f-type">
+      <option value="all">全部题型</option>
+      <option value="单选题">单选题</option>
+      <option value="多选题">多选题</option>
+      <option value="判断题">判断题</option>
+    </select>
+    <button id="b-shuffle" class="ghost">🔀 随机</button>
+    <button id="b-wrong">⚠️ 错题</button>
+    <button id="b-reset" class="danger">🗑️ 清空本题库记录</button>
+  </div>
+
+  <!-- 题目区 -->
+  <div class="card" id="quiz-card">
+    <div id="question-box"></div>
+    <div class="q-actions" id="quiz-actions">
+      <button class="btn btn-pri" id="b-submit">提交答案</button>
+    </div>
+    <div id="result-box"></div>
+    <div class="nav">
+      <button id="b-prev">← 上一题</button>
+      <span id="q-pos" style="font-size:14px;color:var(--gray);"></span>
+      <button id="b-next">下一题 →</button>
+    </div>
+  </div>
+
+  <!-- 背题模式 · 答案 (默认隐藏, 点按钮揭晓) -->
+  <div class="card hidden" id="recite-panel">
+    <div id="recite-question"></div>
+    <div class="recite-answer">
+      <span class="recite-label">正确答案</span>
+      <span class="recite-ans blur" id="recite-ans">--</span>
+    </div>
+    <div class="analysis" id="recite-analysis"></div>
+    <div class="q-actions">
+      <button class="btn btn-pri" id="b-reveal">👁️ 揭晓答案</button>
+    </div>
+    <div class="nav">
+      <button id="b-r-prev">← 上一题</button>
+      <span id="q-pos-r" style="font-size:14px;color:var(--gray);"></span>
+      <button id="b-r-next">下一题 →</button>
+    </div>
+  </div>
+
+  <!-- 错题/完成区 -->
+  <div class="card hidden" id="finish-card">
+    <div class="finish">
+      <h2 id="finish-title">🎉 练习完成</h2>
+      <p id="finish-desc"></p>
+      <button class="btn btn-pri" id="b-restart" style="max-width:200px;margin:16px auto 0;">再来一次</button>
+    </div>
+  </div>
+
+  <footer>
+    多套题库可自由切换 · 每套题库的答题记录独立保存 · 数据存于浏览器本地，清除缓存会丢失
+  </footer>
+</div>
+
+<script src="banks.js"></script>
+<script src="data/jr_jc_1.js"></script>
+<script src="data/jr_jc_2.js"></script>
+<script src="data/jr_jc_3.js"></script>
+<script src="data/fl_fg_1.js"></script>
+<script src="data/fl_fg_2.js"></script>
+<script src="data/fl_fg_3.js"></script>
+<script src="data/fl_yt_1.js"></script>
+<script src="data/fl_yt_2.js"></script>
+<script src="data/fl_yt_3.js"></script>
+<script src="data/jr_yt_1.js"></script>
+<script src="data/jr_yt_2.js"></script>
+<script src="data/jr_yt_3.js"></script>
+<script>
+/* ===== localStorage 安全封装 ===== */
+const Store = {
+  _mem: {},
+  get(key){ try { return localStorage.getItem(key); } catch(e){ return this._mem[key] || null; } },
+  set(key, val){ try { localStorage.setItem(key, val); } catch(e){ this._mem[key] = val; } }
+};
+
+/* ===== 题库管理 ===== */
+let banks = (typeof BANKS !== 'undefined') ? BANKS.banks : [];
+let curBankId = null;
+
+// 每个题库独立的存储 key
+function storeKey(bankId){ return 'flaw_bank_' + bankId + '_v2'; }
+
+/* ===== 数据 & 状态 ===== */
+let ALL = [];
+let list = [];
+let cur = 0;
+let wrongSet = new Set();
+let doneMap = {};
+let mode = 'all';        // all / wrong
+let appMode = 'quiz';    // quiz(答题) / recite(背题)
+let shuffled = false;
+
+/* ===== 加载/保存 (按题库隔离) ===== */
+function save(){
+  Store.set(storeKey(curBankId), JSON.stringify({ wrong:[...wrongSet], done:doneMap }));
+}
+function load(){
+  try{
+    const s = JSON.parse(Store.get(storeKey(curBankId))||'{}');
+    wrongSet = new Set(s.wrong||[]);
+    doneMap = s.done||{};
+  }catch(e){ wrongSet = new Set(); doneMap = {}; }
+}
+
+/* ===== 切换题库 ===== */
+function switchBank(bankId){
+  curBankId = bankId;
+  const bank = banks.find(b=>b.id===bankId);
+  // 动态加载对应数据文件
+  loadBankData(bankId).then(data=>{
+    ALL = data;
+    // 重置状态
+    cur = 0; shuffled = false;
+    document.getElementById('f-type').value = 'all';
+    mode = 'all';   // 避免残留「错题」筛选导致新题库显示"无题目"
+    document.getElementById('f-mode').value = 'quiz';
+    appMode = 'quiz';
+    // 加载本题库的记录
+    load();
+    buildList();
+    render();
+    document.getElementById('finish-card').classList.add('hidden');
+    document.getElementById('quiz-card').classList.remove('hidden');
+    document.getElementById('recite-panel').classList.add('hidden');
+    updateBankInfo(bank);
+  });
+}
+
+// 动态加载题库数据 (内联变量 / fetch JSON 兜底)
+function loadBankData(bankId){
+  return new Promise(resolve=>{
+    // 优先用内联变量 (data/xxx.js 定义了 window.EXAM_DATA_xxx)
+    const varName = 'EXAM_DATA_' + bankId;
+    if(typeof window[varName] !== 'undefined'){
+      resolve(window[varName]);
+      return;
+    }
+    // 兜底: fetch JSON (在浏览器环境; 本地双击 file:// 可能失败, 用内联变量更稳)
+    if(typeof fetch === 'undefined'){ resolve([]); return; }
+    const bank = banks.find(b=>b.id===bankId);
+    const url = (bank && bank.file) ? bank.file.replace('.js','.json') : ('data/'+bankId+'.json');
+    fetch(url)
+      .then(r=>r.json())
+      .then(resolve)
+      .catch(()=>resolve([]));
+  });
+}
+
+function updateBankInfo(bank){
+  const types = {};
+  ALL.forEach(q=>{ types[q.type]=(types[q.type]||0)+1; });
+  const typeStr = Object.entries(types).map(([k,v])=>`${k}${v}`).join(' / ');
+  document.getElementById('bank-info').innerHTML =
+    `<b>${bank.name}</b> · 共 ${ALL.length} 题（${typeStr}）${bank.description?'<br>'+bank.description:''}`;
+}
+
+/* ===== 初始化列表 ===== */
+function buildList(){
+  let pool = ALL;
+  // 题型筛选(原模板只处理了 wrong, 类型下拉实际无效)
+  const t = document.getElementById('f-type').value;
+  if(t !== 'all'){ pool = pool.filter(q=>q.type===t); }
+  if(mode==='wrong'){
+    pool = pool.filter(q=>wrongSet.has(q.number));
+  }
+  list = pool.map(q=>({idx: ALL.indexOf(q), number:q.number}));
+  if(shuffled) list = list.map(x=>x).sort(()=>Math.random()-0.5);
+  if(cur>=list.length) cur=0;
+}
+
+/* ===== 渲染题目 ===== */
+function render(){
+  const box = document.getElementById('question-box');
+  const rbox = document.getElementById('result-box');
+  rbox.innerHTML='';
+  document.getElementById('finish-card').classList.add('hidden');
+
+  if(list.length===0){
+    box.innerHTML = '<div style="text-align:center;color:var(--gray);padding:30px;">🎉 这一组没有题目啦！</div>';
+    updateStats();
+    return;
+  }
+  if(cur>=list.length){ showFinish(); return; }
+
+  const q = ALL[list[cur].idx];
+  const isJudge = q.type==='判断题';
+  const isMulti = q.type==='多选题' || (q.answer&&q.answer.length>1);
+
+  if(appMode==='recite'){
+    renderRecite(q);
+    return;
+  }
+
+  // 答题模式
+  document.getElementById('recite-panel').classList.add('hidden');
+  document.getElementById('quiz-card').classList.remove('hidden');
+
+  const opts = Object.entries(q.options||{}).map(([k,v])=>
+    `<div class="opt${isMulti?' multi':''}" data-key="${k}">
+       <div class="k">${k}</div><div class="v">${v}</div>
+     </div>`).join('');
+
+  box.innerHTML = `
+    <span class="q-type">${q.type}</span>
+    <div class="q-stem">${q.number}. ${q.stem}</div>
+    <div class="opts" id="opts">${opts}</div>
+  `;
+
+  const selected = doneMap[q.number]? doneMap[q.number].selected.split('') : [];
+  box.querySelectorAll('.opt').forEach(el=>{
+    if(selected.includes(el.dataset.key)) el.classList.add('sel');
+    el.addEventListener('click', ()=>{
+      if(isMulti){
+        el.classList.toggle('sel');
+      }else{
+        box.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+        el.classList.add('sel');
+      }
+    });
+  });
+
+  document.getElementById('q-pos').textContent = `${cur+1} / ${list.length}`;
+  updateStats();
+}
+
+/* ===== 背题模式渲染 ===== */
+function renderRecite(q){
+  document.getElementById('quiz-card').classList.add('hidden');
+  document.getElementById('recite-panel').classList.remove('hidden');
+
+  const isJudge = q.type==='判断题';
+  const isMulti = q.type==='多选题' || (q.answer&&q.answer.length>1);
+  const opts = Object.entries(q.options||{}).map(([k,v])=>
+    `<div class="opt${isMulti?' multi':''}">
+       <div class="k">${k}</div><div class="v">${v}</div>
+     </div>`).join('');
+
+  document.getElementById('recite-question').innerHTML = `
+    <span class="q-type">${q.type}</span>
+    <div class="q-stem">${q.number}. ${q.stem}</div>
+    <div class="opts">${opts}</div>
+  `;
+  const ansEl = document.getElementById('recite-ans');
+  ansEl.textContent = q.answer;
+  ansEl.classList.add('blur');
+  const anEl = document.getElementById('recite-analysis');
+  anEl.textContent = q.analysis||'（暂无解析）';
+  anEl.classList.remove('show');
+  document.getElementById('q-pos-r').textContent = `${cur+1} / ${list.length}`;
+}
+
+function reveal(){
+  document.getElementById('recite-ans').classList.remove('blur');
+  document.getElementById('recite-analysis').classList.add('show');
+}
+
+/* ===== 提交判分 ===== */
+function submit(){
+  const q = ALL[list[cur].idx];
+  const sel = [...document.querySelectorAll('#opts .opt.sel')].map(e=>e.dataset.key).sort();
+  if(sel.length===0){ alert('请先选择答案～'); return; }
+
+  const correct = sel.join('')===q.answer.split('').sort().join('');
+  const selStr = sel.join('');
+  doneMap[q.number] = {selected:selStr, correct};
+  if(!correct) wrongSet.add(q.number);
+  else wrongSet.delete(q.number);
+  save();
+
+  // 高亮
+  document.querySelectorAll('#opts .opt').forEach(el=>{
+    const k = el.dataset.key;
+    if(q.answer.includes(k)) el.classList.add('correct');
+    else if(sel.includes(k)) el.classList.add('wrong');
+    else el.classList.add('dim');
+  });
+
+  const rbox = document.getElementById('result-box');
+  rbox.innerHTML = `<div class="result ${correct?'ok':'err'}">
+    ${correct?'✅ 回答正确！':'❌ 回答错误，正确答案是：'+q.answer}
+  </div>
+  <div class="analysis">${q.analysis||''}</div>`;
+  updateStats();
+}
+
+/* ===== 统计 ===== */
+function updateStats(){
+  const total = ALL.length;
+  const done = Object.keys(doneMap).length;
+  const ok = Object.values(doneMap).filter(v=>v.correct).length;
+  const err = done - ok;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-done').textContent = done;
+  document.getElementById('s-ok').textContent = ok;
+  document.getElementById('s-err').textContent = err;
+  document.getElementById('prog').style.width = (total? (done/total*100):0) + '%';
+}
+
+/* ===== 完成页 ===== */
+function showFinish(){
+  document.getElementById('quiz-card').classList.add('hidden');
+  document.getElementById('recite-panel').classList.add('hidden');
+  const fc = document.getElementById('finish-card');
+  fc.classList.remove('hidden');
+  if(appMode==='recite'){
+    document.getElementById('finish-title').textContent = '📖 背题结束';
+    document.getElementById('finish-desc').innerHTML =
+      `本组共 ${list.length} 题，已完成一轮背诵。<br>可切换回「✍️ 答题模式」自测掌握程度。`;
+  } else {
+    const ok = Object.keys(doneMap).filter(k=>doneMap[k].correct).length;
+    document.getElementById('finish-title').textContent = mode==='wrong'?'📋 错题复习结束':'🎉 练习完成';
+    document.getElementById('finish-desc').innerHTML =
+      `本组共 ${list.length} 题，答对 <b style="color:var(--ok)">${ok}</b> 题，答错 <b style="color:var(--err)">${list.length-ok}</b> 题。<br>
+       错题已自动收录，可点击「⚠️ 错题」集中复习。`;
+  }
+  fc.scrollIntoView();
+}
+
+/* ===== 事件 ===== */
+document.getElementById('b-submit').addEventListener('click', submit);
+document.getElementById('b-next').addEventListener('click', ()=>{
+  if(cur>=list.length-1){ showFinish(); return; }
+  cur++; render();
+});
+document.getElementById('b-prev').addEventListener('click', ()=>{
+  if(cur>0){ cur--; render(); }
+});
+document.getElementById('b-r-next').addEventListener('click', ()=>{
+  if(cur>=list.length-1){ showFinish(); return; }
+  cur++; render();
+});
+document.getElementById('b-r-prev').addEventListener('click', ()=>{
+  if(cur>0){ cur--; render(); }
+});
+document.getElementById('b-reveal').addEventListener('click', reveal);
+
+// 题库切换
+document.getElementById('f-bank').addEventListener('change', e=>{
+  if(e.target.value===curBankId) return;
+  if(wrongSet.size>0 || Object.keys(doneMap).length>0){
+    if(!confirm('切换题库会清空当前答题进度（原题库记录已自动保存），确定切换吗？')){
+      e.target.value = curBankId;
+      return;
+    }
+  }
+  switchBank(e.target.value);
+});
+
+// 模式切换
+document.getElementById('f-mode').addEventListener('change', e=>{
+  appMode = e.target.value;
+  cur=0; buildList(); render();
+  document.getElementById('finish-card').classList.add('hidden');
+});
+
+document.getElementById('f-type').addEventListener('change', e=>{
+  mode = e.target.value;
+  cur=0; buildList(); render();
+  document.getElementById('finish-card').classList.add('hidden');
+});
+document.getElementById('b-shuffle').addEventListener('click', ()=>{
+  shuffled=!shuffled;
+  cur=0; buildList(); render();
+  alert(shuffled?'已随机排序，将按乱序出题':'已恢复原始顺序');
+});
+document.getElementById('b-wrong').addEventListener('click', ()=>{
+  document.getElementById('f-type').value='all';
+  mode='wrong'; cur=0; buildList(); render();
+  document.getElementById('finish-card').classList.add('hidden');
+});
+document.getElementById('b-reset').addEventListener('click', ()=>{
+  if(confirm('确定清空【当前题库】的答题记录和错题本吗？此操作不可恢复。')){
+    wrongSet.clear(); doneMap={}; save(); cur=0; buildList(); render();
+  }
+});
+document.getElementById('b-restart').addEventListener('click', ()=>{
+  cur=0; buildList();
+  document.getElementById('finish-card').classList.add('hidden');
+  render();
+});
+
+/* ===== 启动 ===== */
+function init(){
+  const sel = document.getElementById('f-bank');
+  banks.forEach(b=>{
+    const o = document.createElement('option');
+    o.value = b.id; o.textContent = b.name;
+    sel.appendChild(o);
+  });
+  const first = banks[0] && banks[0].id;
+  if(first){ sel.value = first; switchBank(first); }
+  else { document.getElementById('question-box').innerHTML = '暂无题库，请在 banks/ 目录添加。'; }
+}
+init();
+</script>
+</body>
+</html>
