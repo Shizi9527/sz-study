@@ -127,6 +127,7 @@
       <option value="判断题">判断题</option>
     </select>
     <button id="b-shuffle" class="ghost">🔀 随机</button>
+    <button id="b-auto" class="ghost">⏭ 自动下一题：开</button>
     <button id="b-wrong">⚠️ 错题</button>
     <button id="b-reset" class="danger">🗑️ 清空本题库记录</button>
   </div>
@@ -214,6 +215,8 @@ let doneMap = {};
 let mode = 'all';        // all / wrong
 let appMode = 'quiz';    // quiz(答题) / recite(背题)
 let shuffled = false;
+let autoNext = true;     // 答完自动跳下一题(可关)
+let autoTimer = null;    // 自动跳转定时器
 
 /* ===== 加载/保存 (按题库隔离) ===== */
 function save(){
@@ -331,7 +334,8 @@ function render(){
     <div class="opts" id="opts">${opts}</div>
   `;
 
-  const selected = doneMap[q.number]? doneMap[q.number].selected.split('') : [];
+  const rec = doneMap[q.number];
+  const selected = rec ? rec.selected.split('') : [];
   box.querySelectorAll('.opt').forEach(el=>{
     if(selected.includes(el.dataset.key)) el.classList.add('sel');
     el.addEventListener('click', ()=>{
@@ -343,6 +347,21 @@ function render(){
       }
     });
   });
+
+  // 已作答的题(回到本页/错题本复核): 直接显示上次结果+解析, 仍可点选项重新作答
+  if(rec){
+    box.querySelectorAll('#opts .opt').forEach(el=>{
+      const k = el.dataset.key;
+      if(q.answer.includes(k)) el.classList.add('correct');
+      else if(rec.selected.includes(k)) el.classList.add('wrong');
+      else el.classList.add('dim');
+    });
+    rbox.innerHTML = `<div class="result ${rec.correct?'ok':'err'}">
+      ${rec.correct?'✅ 上次回答正确':'❌ 上次回答错误 · 正确答案是：'+q.answer}
+    </div>
+    <div class="analysis">${q.analysis||''}</div>
+    <div style="font-size:12px;color:var(--gray);margin-top:6px;">👆 点击选项可重新作答</div>`;
+  }
 
   document.getElementById('q-pos').textContent = `${cur+1} / ${list.length}`;
   updateStats();
@@ -356,7 +375,7 @@ function renderRecite(q){
   const isJudge = q.type==='判断题';
   const isMulti = q.type==='多选题' || (q.answer&&q.answer.length>1);
   const opts = Object.entries(q.options||{}).map(([k,v])=>
-    `<div class="opt${isMulti?' multi':''}">
+    `<div class="opt${isMulti?' multi':''}" data-key="${k}">
        <div class="k">${k}</div><div class="v">${v}</div>
      </div>`).join('');
 
@@ -365,6 +384,22 @@ function renderRecite(q){
     <div class="q-stem">${q.number}. ${q.stem}</div>
     <div class="opts">${opts}</div>
   `;
+
+  // 背题模式也支持先选答案再揭晓(单选互斥 / 多选可多选), 已答过的题恢复上次选择
+  const rec = doneMap[q.number];
+  const selected = rec ? rec.selected.split('') : [];
+  document.querySelectorAll('#recite-panel .opt').forEach(el=>{
+    if(selected.includes(el.dataset.key)) el.classList.add('sel');
+    el.addEventListener('click', ()=>{
+      if(isMulti){
+        el.classList.toggle('sel');
+      }else{
+        document.querySelectorAll('#recite-panel .opt').forEach(o=>o.classList.remove('sel'));
+        el.classList.add('sel');
+      }
+    });
+  });
+
   const ansEl = document.getElementById('recite-ans');
   ansEl.textContent = q.answer;
   ansEl.classList.add('blur');
@@ -377,6 +412,15 @@ function renderRecite(q){
 function reveal(){
   document.getElementById('recite-ans').classList.remove('blur');
   document.getElementById('recite-analysis').classList.add('show');
+  // 揭晓答案时同时标出对错
+  const q = ALL[list[cur].idx];
+  const picked = [...document.querySelectorAll('#recite-panel .opt.sel')].map(e=>e.dataset.key);
+  document.querySelectorAll('#recite-panel .opt').forEach(el=>{
+    const k = el.dataset.key;
+    if(q.answer.includes(k)) el.classList.add('correct');
+    else if(picked.includes(k)) el.classList.add('wrong');
+    else el.classList.add('dim');
+  });
 }
 
 /* ===== 提交判分 ===== */
@@ -406,6 +450,24 @@ function submit(){
   </div>
   <div class="analysis">${q.analysis||''}</div>`;
   updateStats();
+
+  // 答完自动跳下一题(可右上角开关关闭)
+  clearTimeout(autoTimer);
+  if(autoNext && cur < list.length-1){
+    rbox.innerHTML += '<div style="font-size:12px;color:var(--gray);margin-top:6px;">⏭ 即将自动跳转下一题…</div>';
+    autoTimer = setTimeout(nextQ, 2500);
+  }
+}
+
+/* ===== 翻页 ===== */
+function nextQ(){
+  clearTimeout(autoTimer);
+  if(cur>=list.length-1){ showFinish(); return; }
+  cur++; render();
+}
+function prevQ(){
+  clearTimeout(autoTimer);
+  if(cur>0){ cur--; render(); }
 }
 
 /* ===== 统计 ===== */
@@ -443,21 +505,23 @@ function showFinish(){
 
 /* ===== 事件 ===== */
 document.getElementById('b-submit').addEventListener('click', submit);
-document.getElementById('b-next').addEventListener('click', ()=>{
-  if(cur>=list.length-1){ showFinish(); return; }
-  cur++; render();
-});
-document.getElementById('b-prev').addEventListener('click', ()=>{
-  if(cur>0){ cur--; render(); }
-});
-document.getElementById('b-r-next').addEventListener('click', ()=>{
-  if(cur>=list.length-1){ showFinish(); return; }
-  cur++; render();
-});
-document.getElementById('b-r-prev').addEventListener('click', ()=>{
-  if(cur>0){ cur--; render(); }
-});
+document.getElementById('b-next').addEventListener('click', nextQ);
+document.getElementById('b-prev').addEventListener('click', prevQ);
+document.getElementById('b-r-next').addEventListener('click', nextQ);
+document.getElementById('b-r-prev').addEventListener('click', prevQ);
 document.getElementById('b-reveal').addEventListener('click', reveal);
+
+// 自动下一题开关
+(function initAutoBtn(){
+  try{ autoNext = JSON.parse(Store.get('flaw_autoNext') || 'true'); }catch(e){}
+  const btn = document.getElementById('b-auto');
+  btn.textContent = autoNext ? '⏭ 自动下一题：开' : '⏭ 自动下一题：关';
+  btn.addEventListener('click', ()=>{
+    autoNext = !autoNext;
+    Store.set('flaw_autoNext', JSON.stringify(autoNext));
+    btn.textContent = autoNext ? '⏭ 自动下一题：开' : '⏭ 自动下一题：关';
+  });
+})();
 
 // 题库切换
 document.getElementById('f-bank').addEventListener('change', e=>{
